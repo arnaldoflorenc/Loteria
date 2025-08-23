@@ -5,10 +5,13 @@
 #include <unistd.h>
 #include <list>
 #include <string>
-
-list<int> aposta;
+#include <thread>
 
 using namespace std;
+
+using std::list;
+
+list<int> aposta;
 
 void escutar(){
 

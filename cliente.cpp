@@ -3,8 +3,27 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <thread>
 
 using namespace std;
+
+void inputcliente (int clientSocket){
+    string msg;
+    while (true){    
+    getline(cin, msg);
+    send (clientSocket, msg.c_str(), msg.size(), 0);
+    }
+}
+
+void recebecliente (int clientSocket){
+    char buffer[1024] = {0};
+    while (true){
+    recv(clientSocket, buffer, sizeof(buffer), 0);
+    cout<<"Mensagem do servidor: "<<buffer<<endl;
+    memset(buffer, 0, sizeof(buffer));
+    }
+
+}
 
 int main(){
 
@@ -19,6 +38,13 @@ int main(){
     
     const char* message = "Ola do cliente!";
     send(clientSocket, message, strlen(message),0);
+
+    thread t1(inputcliente, clientSocket);
+    thread t2(recebecliente, clientSocket);
+
+    t1.join();
+    t2.join();
+
 
     close(clientSocket);
     return 0;
