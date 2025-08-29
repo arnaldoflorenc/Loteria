@@ -2,24 +2,43 @@
 #include <iostream>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <sstream>
 #include <unistd.h>
 #include <list>
 #include <thread>
 
-list<int> aposta;
-
 using namespace std;
 
+list<int> aposta;
+
+void registraAposta(string& msg){
+    stringstream msg_client(msg);
+    int valor;
+    while(msg_client >> valor){
+        aposta.push_back(valor);
+    }
+
+}
+
 void escutar(int clientSocket){
-    int apost_client;
+    char buffer[1024];
     while(true){
-        ssize_t tam = read(clientSocket, &apost_client, sizeof(apost_client));
+        ssize_t tam = read(clientSocket, buffer, sizeof(buffer)-1);
         if(tam <= 0){
             close(clientSocket);
             return;
         }
-        aposta.push_back(apost_client);
-        cout <<"Aposta computada!!"<<aposta<<endl;
+        buffer[tam] = '\0';
+        string msg(buffer);
+
+        registraAposta(msg);
+
+        cout << "Aposta Recebida!"<<endl;
+        
+        for(int ap : aposta){
+            cout <<"Aposta computada!!"<<ap<<endl;
+        }
+        
     }
 }
 
