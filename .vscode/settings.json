@@ -102,6 +102,18 @@
     "numeric": "cpp",
     "optional": "cpp",
     "random": "cpp",
-    "utility": "cpp"
+    "utility": "cpp",
+    "charconv": "cpp",
+    "chrono": "cpp",
+    "ctime": "cpp",
+    "ratio": "cpp",
+    "format": "cpp",
+    "iomanip": "cpp",
+    "semaphore": "cpp",
+    "span": "cpp",
+    "sstream": "cpp",
+    "stop_token": "cpp",
+    "thread": "cpp",
+    "variant": "cpp"
   }
 }
