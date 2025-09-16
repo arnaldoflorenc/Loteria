@@ -2,39 +2,121 @@
 #include <iostream>
 #include <netinet/in.h>
 #include <sys/socket.h>
+#include <sstream>
 #include <unistd.h>
+#include <ctime>
+#include <chrono>
 #include <list>
-#include <string>
-
-list<int> aposta;
+#include <thread>
+#include <cstdlib>
 
 using namespace std;
 
-void escutar(){
+enum class tipo_aposta{ //Enum que fala qual o tipo de aposta, se n houver especificando inicio e fim é padrão
+    PADRAO,
+    SELECIONADA
+};
 
+list<int> aposta;
+
+tipo_aposta defTipo(){
+    if(aposta.size() == 6){
+        return tipo_aposta::PADRAO;
+    } else{
+        return tipo_aposta::SELECIONADA;
+    }
 }
 
-void sorteio(list<int> sorteada){
-
+void registraAposta(string& msg){
+    stringstream msg_client(msg);
+    int valor;
+    while(msg_client >> valor){
+        aposta.push_back(valor);
+    }
 }
 
-int main(){
-    list<int> sorteada;
+void escutar(int clientSocket){
+    char buffer[1024];
+    while(true){
+        ssize_t tam = read(clientSocket, buffer, sizeof(buffer)-1);
+        if(tam <= 0){
+            close(clientSocket);
+            return;
+        }
+        buffer[tam] = '\0';
+        string msg(buffer);
 
+        registraAposta(msg);
+
+        cout << "Aposta Recebida!"<<endl;
+
+        for(int ap : aposta){
+            cout <<"Aposta computada!!"<<ap<<endl;
+        }
+        
+    }
+}
+
+void sorteio(int clientSocket){
+
+    while (aposta.size() < 6) {
+        this_thread::sleep_for(chrono::milliseconds(100));
+    }
+
+    this_thread::sleep_for(chrono::minutes(1));
+    
+    list<int> num_sorteados;
+    
+    if(defTipo() == tipo_aposta::PADRAO){
+        for(int i=0; i<6; i++){//caso padrão sorteia de 0 a 60
+            num_sorteados.push_back(rand()%60);    
+        }
+    }else{
+        int minimo = aposta.front();
+        int max = aposta.front();
+        aposta.pop_front();
+        aposta.pop_front();
+        
+        for(int i=0; i<6; i++){//caso selecionado sorteia de minimo até max
+            num_sorteados.push_back(minimo + rand()%max);    
+        }
+    }
+
+    string result = (aposta == num_sorteados) ? "Você ganhou!!" : "Você perdeu... tente novamente";
+    stringstream aux;
+    for(int n : num_sorteados){
+        aux << n <<" ";
+    }
+
+    result += "\nNúmeros Sorteados: " + aux.str();
+    send(clientSocket, result.c_str(), result.size(), 0);
+}
+
+int main(){ 
+    //hora em sec para seed
+    time_t now = time(nullptr);
+    tm* hr_local = localtime(&now);
+    int seg_seed = (hr_local->tm_hour * 3600) + (hr_local->tm_min * 60);
+    srand(seg_seed);
+
+    //inicio conectividade do server
     int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-
     sockaddr_in serverAdress;
     serverAdress.sin_family = AF_INET;
     serverAdress.sin_port = htons(8080);
     serverAdress.sin_addr.s_addr = INADDR_ANY;
-
     bind(serverSocket, (struct sockaddr*)&serverAdress, sizeof(serverAdress));
     listen(serverSocket,5);
+    cout<<"Servidor pronto para receber conexões\n";
 
-    int clientSocket = accept(serverSocket, nullptr, nullptr);
-    char buffer[1024] = {0};
-    recv(clientSocket, buffer, sizeof(buffer), 0);
-    cout<<"MSG cliente: "<<buffer<<endl;
+    while(true){
+        int clientSocket = accept(serverSocket, nullptr, nullptr);
+        cout<<"Client conectado\n";
+
+        thread(escutar,clientSocket).detach();//escutar novos clientes
+
+        thread(sorteio, clientSocket).detach();//sortear nums
+    }
 
     close(serverSocket);
 
