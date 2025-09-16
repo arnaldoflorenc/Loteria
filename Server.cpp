@@ -28,11 +28,12 @@ tipo_aposta defTipo(){
 }
 
 void registraAposta(string& msg){
-    stringstream msg_client(msg);
+    stringstream msg_client(msg);    
     int valor;
     while(msg_client >> valor){
         aposta.push_back(valor);
     }
+    cout << "Aposta registrada! -> \t" + msg <<endl;
 }
 
 void escutar(int clientSocket){
@@ -49,11 +50,10 @@ void escutar(int clientSocket){
         registraAposta(msg);
 
         cout << "Aposta Recebida!"<<endl;
-
-        for(int ap : aposta){
-            cout <<"Aposta computada!!"<<ap<<endl;
+        cout <<"Aposta computada!!\n"<<endl;
+        if (buffer[tam] == '\0') {
+            return;
         }
-        
     }
 }
 
@@ -63,13 +63,12 @@ void sorteio(int clientSocket){
         this_thread::sleep_for(chrono::milliseconds(100));
     }
 
-    this_thread::sleep_for(chrono::minutes(1));
+    this_thread::sleep_for(chrono::seconds(5));
     
     list<int> num_sorteados;
-    
     if(defTipo() == tipo_aposta::PADRAO){
         for(int i=0; i<6; i++){//caso padrão sorteia de 0 a 60
-            num_sorteados.push_back(rand()%60);    
+            num_sorteados.push_back(rand()%100);    
         }
     }else{
         int minimo = aposta.front();
@@ -81,15 +80,14 @@ void sorteio(int clientSocket){
             num_sorteados.push_back(minimo + rand()%max);    
         }
     }
-
     string result = (aposta == num_sorteados) ? "Você ganhou!!" : "Você perdeu... tente novamente";
     stringstream aux;
     for(int n : num_sorteados){
         aux << n <<" ";
     }
-
     result += "\nNúmeros Sorteados: " + aux.str();
     send(clientSocket, result.c_str(), result.size(), 0);
+    cout << "Resultado enviado ao cliente!" << endl;
 }
 
 int main(){ 
@@ -108,15 +106,22 @@ int main(){
     bind(serverSocket, (struct sockaddr*)&serverAdress, sizeof(serverAdress));
     listen(serverSocket,5);
     cout<<"Servidor pronto para receber conexões\n";
-
+    int clientSocket = accept(serverSocket, nullptr, nullptr);
+    cout<<"Client conectado\n";
     while(true){
-        int clientSocket = accept(serverSocket, nullptr, nullptr);
-        cout<<"Client conectado\n";
+        
 
-        thread(escutar,clientSocket).detach();//escutar novos clientes
+        thread t1(escutar,clientSocket);//escutar novos clientes
+        thread t2(sorteio, clientSocket);//sortear nums
+        t1.join();
+        t2.join();
 
-        thread(sorteio, clientSocket).detach();//sortear nums
+        aposta.clear();
+        cout<<"Aposta finalizada, esperando novo cliente\n";
     }
+    
+    cout << "Servidor encerrando..." << endl;
+
 
     close(serverSocket);
 
