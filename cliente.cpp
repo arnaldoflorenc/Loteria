@@ -12,22 +12,25 @@ using namespace std;
 
 void inputcliente (int clientSocket){
     string msg;
-    cout << "Digite sua aposta (6 números separados por espaço):" << endl;
+
+    //cout << "Digite sua aposta :" << endl;
     while (true){    
     getline(cin, msg);
-    if (msg == "exit") break;
     if (!msg.empty()){
-    send (clientSocket, msg.c_str(), msg.size(), 0);
+        send (clientSocket, msg.c_str(), msg.size(), 0);
     }
+    if (msg == ":exit") exit(0);
     }
 }
 
 void recebecliente (int clientSocket){
     char buffer[1024] = {0};
-    while (true){
-    recv(clientSocket, buffer, sizeof(buffer), 0);
-    cout<<"Mensagem do servidor: "<<buffer<<endl;
-    memset(buffer, 0, sizeof(buffer));
+        while (true){
+            int n = recv(clientSocket, buffer, sizeof(buffer), 0);
+            
+            std::string resposta(buffer);
+            cout << "Mensagem do servidor: " << resposta << endl;
+            memset(buffer, 0, sizeof(buffer));
     }
 }
 
@@ -43,13 +46,26 @@ int main(){
     serverAdress.sin_port = htons(8080);
     serverAdress.sin_addr.s_addr = INADDR_ANY;
 
+
+
     connect(clientSocket, (struct sockaddr*)&serverAdress, sizeof(serverAdress));
+
     cout<< put_time(now_tm, "%H:%M:%S") << ": CONECTADO!!"<< endl;
+
+    // Prompt de comandos
+    cout << "\nComandos disponíveis:\n";
+    cout << ":inicio <NUM>   - Define início do intervalo da loteria\n";
+    cout << ":fim <NUM>      - Define fim do intervalo da loteria\n";
+    cout << ":qtd <NUM>      - Define quantidade de números sorteados\n";
+    cout << ":exit           - Sair do sistema\n";
+    cout << "Aposta:         - Digite os números separados por espaço\n";
+    cout << "---------------------------------------------\n";
+
     while(true){
-    thread t1(inputcliente, clientSocket);
-    thread t2(recebecliente, clientSocket);
-    t1.join();
-    t2.join();
+        thread t1(inputcliente, clientSocket);
+        thread t2(recebecliente, clientSocket);
+        t1.join();
+        t2.join();
     }
 
     close(clientSocket);
