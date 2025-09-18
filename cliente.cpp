@@ -7,28 +7,57 @@
 #include <chrono>
 #include <ctime>
 #include <iomanip>
+#include <atomic>
 
 using namespace std;
 
+atomic<bool> encerrar(false); 
+
 void inputcliente (int clientSocket){
     string msg;
-
     //cout << "Digite sua aposta :" << endl;
-    while (true){    
-    getline(cin, msg);
-    if (!msg.empty()){
-        send (clientSocket, msg.c_str(), msg.size(), 0);
-    }
-    if (msg == ":exit") exit(0);
+    while (!encerrar) {
+        fd_set set;
+        FD_ZERO(&set);
+        FD_SET(STDIN_FILENO, &set);
+
+        struct timeval timeout;
+        timeout.tv_sec = 1; 
+        timeout.tv_usec = 0;
+
+        int ready = select(STDIN_FILENO + 1, &set, NULL, NULL, &timeout);
+        if (ready > 0 && FD_ISSET(STDIN_FILENO, &set)) {
+            getline(cin, msg);
+            if (!msg.empty()) {
+                send(clientSocket, msg.c_str(), msg.size(), 0);
+            }
+            if (msg == ":exit") {
+                encerrar = true;
+                close(clientSocket);
+                break;
+            }
+        }
+        // Se encerrar for true, o loop termina sem bloquear
     }
 }
 
 void recebecliente (int clientSocket){
     char buffer[1024] = {0};
-        while (true){
+        while (!encerrar){
             int n = recv(clientSocket, buffer, sizeof(buffer), 0);
-            
-            std::string resposta(buffer);
+            string resposta(buffer);
+            if(resposta == "SERVER_FULL"){
+                cout << "Conexão recusada!! Server lotado! FAZ O L"<<endl;
+                encerrar = true;
+                fclose(stdin);
+                close(clientSocket);
+                break;
+            }
+            if(encerrar){
+                fclose(stdin);
+                close(clientSocket);
+                break;
+            }
             cout << "Mensagem do servidor: " << resposta << endl;
             memset(buffer, 0, sizeof(buffer));
     }
@@ -61,13 +90,11 @@ int main(){
     cout << "Aposta:         - Digite os números separados por espaço\n";
     cout << "---------------------------------------------\n";
 
-    while(true){
-        thread t1(inputcliente, clientSocket);
-        thread t2(recebecliente, clientSocket);
-        t1.join();
-        t2.join();
-    }
-
+   
+    thread t1(inputcliente, clientSocket);
+    thread t2(recebecliente, clientSocket);
+    t1.join();
+    t2.join();
     close(clientSocket);
     return 0;
 }

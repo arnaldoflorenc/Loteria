@@ -23,11 +23,22 @@ struct ConfigLoteria {
     int qtd = 5;
 };
 
-void registraAposta(string& msg, list<int>& aposta_local){
+void registraAposta(string& msg, list<int>& aposta_local, ConfigLoteria& config){
     stringstream msg_client(msg);
-    int valor;
-    while(msg_client >> valor){
-        aposta_local.push_back(valor);
+    string token;
+    while(msg_client >> token){
+        for (char c : token){
+            if(!isdigit(c)){
+                cout << "Aposta inválida! Apenas números são permitidos." << endl;
+                return;
+            }
+        }
+        int token_aux = stoi(token);
+        if(token_aux < config.inicio || token_aux > config.fim){
+            cout << "Aposta inválida! Números devem estar entre 0 e 100." << endl;
+            return;
+        }
+        aposta_local.push_back(token_aux);
     }
     cout << "Aposta registrada! -> \t" << msg << endl;
 }
@@ -70,6 +81,7 @@ void escutar(int clientSocket, list<int>& aposta_local, ConfigLoteria& config){
         {
             if (msg.find(":exit") == 0) {
                 cout << "Cliente solicitou saída. Encerrando conexão." << endl;
+                clientes_ativos--;
                 close(clientSocket);
                 return; // Apenas encerra a thread do cliente
             }
@@ -77,7 +89,7 @@ void escutar(int clientSocket, list<int>& aposta_local, ConfigLoteria& config){
             continue;
         }
 
-        registraAposta(msg, aposta_local);
+        registraAposta(msg, aposta_local, config);
 
         cout << "Aposta Recebida!"<<endl;
         cout <<"Aposta computada!!\n"<<endl;
@@ -150,7 +162,7 @@ int main(int argc, char* argv[]){
         cout << "[DEBUG] accept retornou, socket: " << clientSocket << endl;
         std::lock_guard<std::mutex> lock(mtx_limite);
         if(clientes_ativos.load() >= LIMITE_CLIENTES){
-            string msg = "Limite de clientes atingido. Tente novamente mais tarde.\n";
+            string msg = "SERVER_FULL";
             send(clientSocket, msg.c_str(), msg.size(), 0);
             close(clientSocket);
             cout << "Conexão recusada: limite de clientes atingido." << endl;
