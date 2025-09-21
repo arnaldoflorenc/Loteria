@@ -29,7 +29,14 @@ void inputcliente (int clientSocket){
         if (ready > 0 && FD_ISSET(STDIN_FILENO, &set)) {
             getline(cin, msg);
             if (!msg.empty()) {
-                send(clientSocket, msg.c_str(), msg.size(), 0);
+                ssize_t sent = send(clientSocket, msg.c_str(), msg.size(), 0);
+                if (sent < 0) {
+                    cerr << "Erro ao enviar mensagem ao servidor." << endl;
+                    encerrar = true;
+                    fclose(stdin);
+                    close(clientSocket);
+                    break;
+                }
             }
             if (msg == ":exit") {
                 encerrar = true;
@@ -45,6 +52,13 @@ void recebecliente (int clientSocket){
     char buffer[1024] = {0};
         while (!encerrar){
             int n = recv(clientSocket, buffer, sizeof(buffer), 0);
+            if (n <= 0) {
+                cerr << "Conexão encerrada pelo servidor ou erro na recepção." << endl;
+                encerrar = true;
+                fclose(stdin);
+                close(clientSocket);
+                break;
+            }
             string resposta(buffer);
             if(resposta == "SERVER_FULL"){
                 cout << "Conexão recusada!! Server lotado! FAZ O L"<<endl;
@@ -67,6 +81,10 @@ int main(){
     auto now = chrono::system_clock::now();
     time_t tt = chrono::system_clock::to_time_t(now);
     int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (clientSocket < 0) {
+        cerr << "Erro ao criar socket" << endl;
+        return -1;
+    }
     tm* now_tm = localtime(&tt);
     string msg;
 
@@ -77,7 +95,11 @@ int main(){
 
 
 
-    connect(clientSocket, (struct sockaddr*)&serverAdress, sizeof(serverAdress));
+    if (connect(clientSocket, (struct sockaddr*)&serverAdress, sizeof(serverAdress)) < 0) {
+        cerr << "Erro ao conectar ao servidor" << endl;
+        close(clientSocket);
+        return -1;
+    }
 
     cout<< put_time(now_tm, "%H:%M:%S") << ": CONECTADO!!"<< endl;
 

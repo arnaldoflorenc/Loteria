@@ -23,24 +23,25 @@ struct ConfigLoteria {
     int qtd = 5;
 };
 
-void registraAposta(string& msg, list<int>& aposta_local, ConfigLoteria& config){
+bool registraAposta(string& msg, list<int>& aposta_local, ConfigLoteria& config){
     stringstream msg_client(msg);
     string token;
     while(msg_client >> token){
         for (char c : token){
             if(!isdigit(c)){
                 cout << "Aposta inválida! Apenas números são permitidos." << endl;
-                return;
+                return false;
             }
         }
         int token_aux = stoi(token);
         if(token_aux < config.inicio || token_aux > config.fim){
             cout << "Aposta inválida! Números devem estar entre 0 e 100." << endl;
-            return;
+            return false;
         }
         aposta_local.push_back(token_aux);
     }
     cout << "Aposta registrada! -> \t" << msg << endl;
+    return true;
 }
 
 void tratarComando(const string& msg, ConfigLoteria& config) {
@@ -77,7 +78,7 @@ void escutar(int clientSocket, list<int>& aposta_local, ConfigLoteria& config){
         string msg(buffer);
         cout << "[DEBUG] Recebido do cliente: '" << msg << "'" << endl;
 
-        if (msg[0] == ':')
+        if (!msg.empty() && msg[0] == ':')
         {
             if (msg.find(":exit") == 0) {
                 cout << "Cliente solicitou saída. Encerrando conexão." << endl;
@@ -89,10 +90,12 @@ void escutar(int clientSocket, list<int>& aposta_local, ConfigLoteria& config){
             continue;
         }
 
-        registraAposta(msg, aposta_local, config);
+        if (registraAposta(msg, aposta_local, config)) {
+            cout << "Aposta Recebida!"<<endl;
+            cout <<"Aposta computada!!\n"<<endl;
+        }
 
-        cout << "Aposta Recebida!"<<endl;
-        cout <<"Aposta computada!!\n"<<endl;
+        
         if (buffer[tam] == '\0') {
             return;
         }
@@ -114,8 +117,12 @@ void sorteio(int clientSocket, list<int>& aposta_local, ConfigLoteria& config){
         aux << n <<" ";
     }
     result += "\nNúmeros Sorteados: " + aux.str();
-    send(clientSocket, result.c_str(), result.size(), 0);
-    cout << "Resultado enviado ao cliente!" << endl;
+    ssize_t enviado = send(clientSocket, result.c_str(), result.size(), 0);
+    if (enviado < 0) {
+        cerr << "Erro ao enviar resultado ao cliente." << endl;
+    } else {
+        cout << "Resultado enviado ao cliente!" << endl;
+    }
 }
 
 void handle_client(int clientSocket){
@@ -148,18 +155,34 @@ int main(int argc, char* argv[]){
 
     //inicio conectividade do server
     int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (serverSocket < 0) {
+        cerr << "Erro ao criar socket" << endl;
+        return -1;
+    }
     sockaddr_in serverAdress;
     serverAdress.sin_family = AF_INET;
     serverAdress.sin_port = htons(8080);
     serverAdress.sin_addr.s_addr = INADDR_ANY;
-    bind(serverSocket, (struct sockaddr*)&serverAdress, sizeof(serverAdress));
-    listen(serverSocket,5);
+    if (bind(serverSocket, (struct sockaddr*)&serverAdress, sizeof(serverAdress)) < 0) {
+        cerr << "Erro ao fazer bind" << endl;
+        close(serverSocket);
+        return -1;
+    }
+    if (listen(serverSocket,5) < 0) {
+        cerr << "Erro ao escutar" << endl;
+        close(serverSocket);
+        return -1;
+    }
     cout<<"Servidor pronto para receber conexões\n";
     cout<<"Limite de clientes: "<<LIMITE_CLIENTES<<endl;
     while(true){
-        cout << "[DEBUG] Esperando conexão..." << endl;
+        //cout << "[DEBUG] Esperando conexão..." << endl;
         int clientSocket = accept(serverSocket, nullptr, nullptr);
-        cout << "[DEBUG] accept retornou, socket: " << clientSocket << endl;
+        if (clientSocket < 0) {
+            cerr << "Erro ao aceitar conexão." << endl;
+            continue;
+        }
+        //cout << "[DEBUG] accept retornou, socket: " << clientSocket << endl;
         std::lock_guard<std::mutex> lock(mtx_limite);
         if(clientes_ativos.load() >= LIMITE_CLIENTES){
             string msg = "SERVER_FULL";
