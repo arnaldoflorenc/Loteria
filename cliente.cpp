@@ -61,7 +61,7 @@ void recebecliente (int clientSocket){
             }
             string resposta(buffer);
             if(resposta == "SERVER_FULL"){
-                cout << "Conexão recusada!! Server lotado! FAZ O L"<<endl;
+                cout << "Conexão recusada!! Server lotado!"<<endl;
                 encerrar = true;
                 fclose(stdin);
                 close(clientSocket);
@@ -92,8 +92,6 @@ int main(){
     serverAdress.sin_family = AF_INET;
     serverAdress.sin_port = htons(8080);
     serverAdress.sin_addr.s_addr = INADDR_ANY;
-
-
 
     if (connect(clientSocket, (struct sockaddr*)&serverAdress, sizeof(serverAdress)) < 0) {
         cerr << "Erro ao conectar ao servidor" << endl;
